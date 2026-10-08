@@ -5,7 +5,6 @@ from array import array
 
 from game.beat import Note, LANES, LANE_KEYS, LANE_LABELS, LANE_COLORS
 
-
 WIDTH, HEIGHT = 480, 640
 FPS = 60
 BPM = 120
@@ -21,9 +20,7 @@ class GameEngine:
     def __init__(self):
         pygame.init()
 
-        # =========================
-        # TASK 1: SOUND EFFECTS
-        # =========================
+        # Task 1: hit sound effects
         self.audio_enabled = False
         self.hit_sounds = {}
 
@@ -66,7 +63,7 @@ class GameEngine:
         self.reset()
 
     # =========================
-    # TASK 1: PROCEDURAL SOUND
+    # TASK 1: SOUND CREATION
     # =========================
     def _create_hit_sound(self, frequency, duration):
         sample_rate = 44100
@@ -91,13 +88,11 @@ class GameEngine:
 
     def reset(self):
         self.notes = []
+
         self.score = 0
         self.combo = 0
         self.max_combo = 0
         self.misses = 0
-
-        self.frame = 0
-        self.speed = 5
 
         # =========================
         # TASK 3: BPM SPAWNING
@@ -107,8 +102,19 @@ class GameEngine:
             + BEAT_INTERVAL * 1000
         )
 
+        self.speed = 5
+        self.frame = 0
+
         self.feedback = []
         self.game_over = False
+
+        # =========================
+        # TASK 4: GRADE COUNTERS
+        # =========================
+        self.perfect_count = 0
+        self.great_count = 0
+        self.ok_count = 0
+        self.grade_miss_count = 0
 
     def spawn_note(self):
         lane = random.randint(0, LANES - 1)
@@ -126,6 +132,22 @@ class GameEngine:
                 is_hold=is_hold
             )
         )
+
+    # =========================
+    # TASK 4: RECORD GRADE
+    # =========================
+    def record_grade(self, grade):
+        if grade == "PERFECT":
+            self.perfect_count += 1
+
+        elif grade == "GREAT":
+            self.great_count += 1
+
+        elif grade == "OK":
+            self.ok_count += 1
+
+        elif grade == "MISS":
+            self.grade_miss_count += 1
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -160,6 +182,7 @@ class GameEngine:
         return True
 
     def process_tap(self, lane):
+
         best = None
         best_dist = 9999
 
@@ -172,14 +195,19 @@ class GameEngine:
             ):
 
                 dist = abs(
-                    note.y + Note.HEIGHT // 2 - HIT_Y
+                    note.y
+                    + Note.HEIGHT // 2
+                    - HIT_Y
                 )
 
                 if dist < best_dist:
                     best_dist = dist
                     best = note
 
-        lane_x = lane * LANE_W + LANE_W // 2
+        lane_x = (
+            lane * LANE_W
+            + LANE_W // 2
+        )
 
         if best and best_dist <= HIT_WINDOW:
 
@@ -203,22 +231,28 @@ class GameEngine:
 
                 return
 
-            # =========================
-            # NORMAL NOTE
-            # =========================
             best.hit = True
 
             if best_dist < 8:
-                grade, pts = "PERFECT", 300
+
+                grade = "PERFECT"
+                pts = 300
                 col = (255, 220, 0)
 
             elif best_dist < 18:
-                grade, pts = "GREAT", 200
+
+                grade = "GREAT"
+                pts = 200
                 col = (100, 220, 100)
 
             else:
-                grade, pts = "OK", 100
+
+                grade = "OK"
+                pts = 100
                 col = (180, 180, 255)
+
+            # Task 4
+            self.record_grade(grade)
 
             self.combo += 1
 
@@ -236,6 +270,7 @@ class GameEngine:
             # TASK 1: HIT SOUND
             # =========================
             if self.audio_enabled:
+
                 sound = self.hit_sounds.get(grade)
 
                 if sound:
@@ -252,6 +287,9 @@ class GameEngine:
             )
 
         else:
+
+            # Task 4
+            self.record_grade("MISS")
 
             self.combo = 0
 
@@ -285,6 +323,9 @@ class GameEngine:
                     note.hit = True
                     note.holding = False
 
+                    # Task 4
+                    self.record_grade("PERFECT")
+
                     self.combo += 1
 
                     self.max_combo = max(
@@ -298,7 +339,10 @@ class GameEngine:
                     )
 
                     if self.audio_enabled:
-                        sound = self.hit_sounds.get("PERFECT")
+
+                        sound = self.hit_sounds.get(
+                            "PERFECT"
+                        )
 
                         if sound:
                             sound.play()
@@ -308,7 +352,8 @@ class GameEngine:
                             "PERFECT",
                             (255, 220, 0),
                             40,
-                            lane * LANE_W + LANE_W // 2,
+                            lane * LANE_W
+                            + LANE_W // 2,
                             HIT_Y - 30
                         ]
                     )
@@ -317,6 +362,10 @@ class GameEngine:
 
                     note.missed = True
                     note.holding = False
+
+                    # Task 4
+                    self.record_grade("MISS")
+
                     self.combo = 0
 
                     self.feedback.append(
@@ -324,7 +373,8 @@ class GameEngine:
                             "MISS",
                             (220, 60, 60),
                             40,
-                            lane * LANE_W + LANE_W // 2,
+                            lane * LANE_W
+                            + LANE_W // 2,
                             HIT_Y - 30
                         ]
                     )
@@ -339,7 +389,7 @@ class GameEngine:
         self.frame += 1
 
         # =========================
-        # TASK 3: BPM-SYNCED SPAWN
+        # TASK 3: BPM SPAWNING
         # =========================
         current_time = pygame.time.get_ticks()
 
@@ -351,7 +401,7 @@ class GameEngine:
                 BEAT_INTERVAL * 1000
             )
 
-        # Keep the original speed progression
+        # Preserve speed progression
         if self.frame % 600 == 0:
 
             self.speed = min(
@@ -376,10 +426,18 @@ class GameEngine:
 
                     note.hold_progress += 1
 
-                    if note.hold_progress >= note.hold_duration:
+                    if (
+                        note.hold_progress
+                        >= note.hold_duration
+                    ):
 
                         note.hit = True
                         note.holding = False
+
+                        # Task 4
+                        self.record_grade(
+                            "PERFECT"
+                        )
 
                         self.combo += 1
 
@@ -417,7 +475,22 @@ class GameEngine:
 
                     note.missed = True
                     note.holding = False
+
+                    # Task 4
+                    self.record_grade("MISS")
+
                     self.combo = 0
+
+                    self.feedback.append(
+                        [
+                            "MISS",
+                            (220, 60, 60),
+                            40,
+                            note.lane * LANE_W
+                            + LANE_W // 2,
+                            HIT_Y - 30
+                        ]
+                    )
 
             # =========================
             # MISSED NOTE
@@ -426,12 +499,19 @@ class GameEngine:
                 not note.hit
                 and not note.missed
                 and not note.holding
-                and note.y >
-                HIT_Y + HIT_WINDOW + Note.HEIGHT
+                and note.y
+                > HIT_Y
+                + HIT_WINDOW
+                + Note.HEIGHT
             ):
 
                 note.missed = True
+
                 self.misses += 1
+
+                # Task 4
+                self.record_grade("MISS")
+
                 self.combo = 0
 
         self.notes = [
@@ -439,12 +519,19 @@ class GameEngine:
             for n in self.notes
             if not (
                 n.hit
-                or n.missed and n.y > HEIGHT + 10
+                or n.missed
+                and n.y > HEIGHT + 10
             )
         ]
 
         self.feedback = [
-            [t, c, ttl - 1, x, y]
+            [
+                t,
+                c,
+                ttl - 1,
+                x,
+                y
+            ]
             for t, c, ttl, x, y in self.feedback
             if ttl > 1
         ]
@@ -479,7 +566,10 @@ class GameEngine:
         # Lane buttons
         for i in range(LANES):
 
-            lx = i * LANE_W + LANE_W // 2
+            lx = (
+                i * LANE_W
+                + LANE_W // 2
+            )
 
             pygame.draw.rect(
                 self.screen,
@@ -547,7 +637,8 @@ class GameEngine:
                     (255, 255, 255),
                     pygame.Rect(
                         rect.x,
-                        rect.bottom - progress_height,
+                        rect.bottom
+                        - progress_height,
                         rect.width,
                         progress_height
                     ),
@@ -599,69 +690,141 @@ class GameEngine:
 
         self.screen.blit(sc, (10, 10))
         self.screen.blit(co, (10, 40))
-        self.screen.blit(mi, (WIDTH - 170, 10))
+        self.screen.blit(
+            mi,
+            (WIDTH - 170, 10)
+        )
 
-        # Game over
+        # =========================
+        # TASK 4: GRADE SUMMARY
+        # =========================
         if self.game_over:
-
-            ov = pygame.Surface(
-                (WIDTH, HEIGHT),
-                pygame.SRCALPHA
-            )
-
-            ov.fill(
-                (0, 0, 0, 160)
-            )
-
-            self.screen.blit(
-                ov,
-                (0, 0)
-            )
-
-            msg = self.big_font.render(
-                "GAME OVER",
-                True,
-                (220, 60, 60)
-            )
-
-            sc_msg = self.font.render(
-                f"Final Score: {self.score}  "
-                f"Max Combo: {self.max_combo}x",
-                True,
-                (200, 200, 200)
-            )
-
-            restart = self.font.render(
-                "Press R to Restart",
-                True,
-                (160, 160, 160)
-            )
-
-            self.screen.blit(
-                msg,
-                (
-                    WIDTH // 2 - msg.get_width() // 2,
-                    HEIGHT // 2 - 70
-                )
-            )
-
-            self.screen.blit(
-                sc_msg,
-                (
-                    WIDTH // 2 - sc_msg.get_width() // 2,
-                    HEIGHT // 2
-                )
-            )
-
-            self.screen.blit(
-                restart,
-                (
-                    WIDTH // 2 - restart.get_width() // 2,
-                    HEIGHT // 2 + 50
-                )
-            )
+            self.draw_grade_summary()
 
         pygame.display.flip()
+
+    def draw_grade_summary(self):
+
+        overlay = pygame.Surface(
+            (WIDTH, HEIGHT),
+            pygame.SRCALPHA
+        )
+
+        overlay.fill(
+            (0, 0, 0, 210)
+        )
+
+        self.screen.blit(
+            overlay,
+            (0, 0)
+        )
+
+        # =========================
+        # ACCURACY CALCULATION
+        # =========================
+        total_judged = (
+            self.perfect_count
+            + self.great_count
+            + self.ok_count
+            + self.grade_miss_count
+        )
+
+        successful_hits = (
+            self.perfect_count
+            + self.great_count
+            + self.ok_count
+        )
+
+        if total_judged > 0:
+            accuracy = (
+                successful_hits
+                / total_judged
+                * 100
+            )
+        else:
+            accuracy = 0.0
+
+        title = self.big_font.render(
+            "GRADE SUMMARY",
+            True,
+            (255, 255, 255)
+        )
+
+        self.screen.blit(
+            title,
+            (
+                WIDTH // 2
+                - title.get_width() // 2,
+                90
+            )
+        )
+
+        lines = [
+            (
+                f"PERFECT: {self.perfect_count}",
+                (255, 220, 0)
+            ),
+            (
+                f"GREAT:   {self.great_count}",
+                (100, 220, 100)
+            ),
+            (
+                f"OK:      {self.ok_count}",
+                (180, 180, 255)
+            ),
+            (
+                f"MISS:    {self.grade_miss_count}",
+                (220, 100, 100)
+            ),
+            (
+                f"Accuracy: {accuracy:.2f}%",
+                (255, 255, 255)
+            ),
+            (
+                f"Score: {self.score}",
+                (220, 220, 220)
+            ),
+            (
+                f"Max Combo: {self.max_combo}x",
+                (255, 220, 80)
+            )
+        ]
+
+        y = 180
+
+        for text, color in lines:
+
+            surf = self.font.render(
+                text,
+                True,
+                color
+            )
+
+            self.screen.blit(
+                surf,
+                (
+                    WIDTH // 2
+                    - surf.get_width() // 2,
+                    y
+                )
+            )
+
+            y += 42
+
+        restart = self.font.render(
+            "Press R to Restart",
+            True,
+            (180, 180, 180)
+        )
+
+        self.screen.blit(
+            restart,
+            (
+                WIDTH // 2
+                - restart.get_width() // 2,
+                510
+            )
+        )
 
     def run(self):
 
@@ -670,7 +833,9 @@ class GameEngine:
         while running:
 
             running = self.handle_events()
+
             self.update()
+
             self.draw()
 
             self.clock.tick(FPS)
